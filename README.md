@@ -2,6 +2,7 @@
 <p align="center">
 A minimal graph-based workflow engine built for the AI Engineering Assignment.  
 Supports node execution, looping, shared state, and an example Code Review workflow.
+Done by Eshita Rai.
 </p>
 
 <p align="center">
