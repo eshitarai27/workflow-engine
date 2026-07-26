@@ -1,0 +1,67 @@
+{
+  "id": "wf_summarize_and_notify",
+  "name": "Summarize and Notify",
+  "description": "Reads a text file, summarizes it, records the result in SQLite, and emails the summary.",
+  "nodes": [
+    {
+      "id": "read_file",
+      "name": "Read source file",
+      "action": {
+        "plugin_id": "filesystem",
+        "config": { "operation": "read", "path": "input.txt" }
+      }
+    },
+    {
+      "id": "summarize",
+      "name": "Summarize",
+      "action": {
+        "plugin_id": "python",
+        "config": {
+          "code": "def run(state):\n    text = state.get('content', '')\n    words = text.split()\n    summary = ' '.join(words[:40]) + ('...' if len(words) > 40 else '')\n    return {'summary': summary}"
+        }
+      }
+    },
+    {
+      "id": "create_table",
+      "name": "Ensure table exists",
+      "action": {
+        "plugin_id": "sql",
+        "config": {
+          "db_path": "data/files/summaries.db",
+          "query": "CREATE TABLE IF NOT EXISTS summaries (id INTEGER PRIMARY KEY, summary TEXT)"
+        }
+      }
+    },
+    {
+      "id": "save_record",
+      "name": "Save summary to SQLite",
+      "action": {
+        "plugin_id": "sql",
+        "config": {
+          "db_path": "data/files/summaries.db",
+          "query": "INSERT INTO summaries (summary) VALUES (?)",
+          "params": ["{{summary}}"]
+        }
+      }
+    },
+    {
+      "id": "notify",
+      "name": "Email the summary",
+      "action": {
+        "plugin_id": "email",
+        "config": {
+          "to": "reviewer@example.com",
+          "subject": "Document summary ready",
+          "body": "Summary: {{summary}}"
+        }
+      }
+    }
+  ],
+  "edges": [
+    { "source": "read_file", "target": "summarize" },
+    { "source": "summarize", "target": "create_table" },
+    { "source": "create_table", "target": "save_record" },
+    { "source": "save_record", "target": "notify" }
+  ],
+  "triggers": [{ "type": "MANUAL", "config": {} }]
+}

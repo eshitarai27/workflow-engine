@@ -1,0 +1,55 @@
+{
+  "id": "wf_etl_pipeline",
+  "name": "Parallel ETL Pipeline",
+  "description": "Extracts a batch, transforms it two independent ways in parallel, then loads the merged result -- demonstrates the DAG engine's real concurrency and the Simulation view's critical-path analysis.",
+  "nodes": [
+    {
+      "id": "extract",
+      "name": "Extract batch",
+      "action": {
+        "plugin_id": "python",
+        "config": {
+          "code": "def run(state):\n    return {'records': [1, 2, 3, 4, 5]}"
+        }
+      }
+    },
+    {
+      "id": "transform_sum",
+      "name": "Transform: sum",
+      "action": {
+        "plugin_id": "python",
+        "config": {
+          "code": "def run(state):\n    return {'sum': sum(state.get('records', []))}"
+        }
+      }
+    },
+    {
+      "id": "transform_avg",
+      "name": "Transform: average",
+      "action": {
+        "plugin_id": "python",
+        "config": {
+          "code": "def run(state):\n    records = state.get('records', [])\n    return {'average': sum(records) / len(records) if records else 0}"
+        }
+      }
+    },
+    {
+      "id": "load",
+      "name": "Load merged result",
+      "action": {
+        "plugin_id": "sql",
+        "config": {
+          "db_path": "data/files/etl.db",
+          "query": "CREATE TABLE IF NOT EXISTS etl_results (id INTEGER PRIMARY KEY, total REAL, average REAL)"
+        }
+      }
+    }
+  ],
+  "edges": [
+    { "source": "extract", "target": "transform_sum" },
+    { "source": "extract", "target": "transform_avg" },
+    { "source": "transform_sum", "target": "load" },
+    { "source": "transform_avg", "target": "load" }
+  ],
+  "triggers": [{ "type": "SCHEDULE", "config": { "interval_seconds": 3600 } }]
+}

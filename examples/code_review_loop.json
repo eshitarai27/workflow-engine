@@ -1,0 +1,65 @@
+{
+  "id": "wf_code_review_loop",
+  "name": "Code Review Loop",
+  "description": "Iteratively reviews a code sample, refining a quality score each pass until it clears a threshold. A direct port of this project's original assignment logic onto the DAG engine's bounded-loop node.",
+  "nodes": [
+    {
+      "id": "extract_functions",
+      "name": "Extract functions",
+      "action": {
+        "plugin_id": "python",
+        "config": {
+          "code": "def run(state):\n    code = state.get('code', '')\n    functions = [f'func_at_line_{i}' for i, line in enumerate(code.splitlines(), start=1) if 'def ' in line]\n    return {'functions': functions or ['main']}"
+        }
+      }
+    },
+    {
+      "id": "check_complexity",
+      "name": "Check complexity",
+      "action": {
+        "plugin_id": "python",
+        "config": {
+          "code": "def run(state):\n    code = state.get('code', '')\n    complexity = min(10, max(1, len(code) // 50))\n    return {'complexity': complexity}"
+        }
+      }
+    },
+    {
+      "id": "detect_issues",
+      "name": "Detect issues",
+      "action": {
+        "plugin_id": "python",
+        "config": {
+          "code": "def run(state):\n    issues_found = max(0, state.get('complexity', 1) - 3)\n    return {'issues_found': issues_found}"
+        }
+      }
+    },
+    {
+      "id": "suggest_improvements",
+      "name": "Suggest improvements",
+      "action": {
+        "plugin_id": "python",
+        "config": {
+          "code": "def run(state):\n    suggestions = []\n    if state.get('complexity', 1) > 5:\n        suggestions.append('Refactor large functions into smaller ones.')\n    if state.get('issues_found', 0) > 0:\n        suggestions.append('Reduce nested conditionals and loops.')\n    if not suggestions:\n        suggestions.append('Code looks clean. Minor style improvements only.')\n    return {'suggestions': suggestions}"
+        }
+      }
+    },
+    {
+      "id": "evaluate_quality",
+      "name": "Evaluate quality (loops until threshold)",
+      "action": {
+        "plugin_id": "python",
+        "config": {
+          "code": "def run(state):\n    return {'quality_score': state.get('quality_score', 0) + 2}"
+        }
+      },
+      "loop": { "until_condition": "quality_score >= 7", "max_iterations": 10 }
+    }
+  ],
+  "edges": [
+    { "source": "extract_functions", "target": "check_complexity" },
+    { "source": "check_complexity", "target": "detect_issues" },
+    { "source": "detect_issues", "target": "suggest_improvements" },
+    { "source": "suggest_improvements", "target": "evaluate_quality" }
+  ],
+  "triggers": [{ "type": "MANUAL", "config": {} }]
+}
