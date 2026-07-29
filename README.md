@@ -16,7 +16,7 @@ There is no AI required anywhere in the platform. One optional feature turns a n
 
 ## Live demo
 
-- Dashboard: https://flowforge-dashboard.vercel.app
+- Dashboard: https://flowforge-dashboard.vercel.app — opens on a project overview page explaining the architecture end to end; the operational dashboard lives at `/dashboard`.
 - API: https://flowforge-backend-production-ad69.up.railway.app
 
 A quick way to see it work: `curl -X POST https://flowforge-backend-production-ad69.up.railway.app/workflows -H "Content-Type: application/json" -d @examples/code_review_loop.json` to create a workflow, then open the dashboard to run it and watch the execution graph.
@@ -33,7 +33,7 @@ A quick way to see it work: `curl -X POST https://flowforge-backend-production-a
 - **A scheduler** for interval-based triggers and webhook-triggered runs.
 - **A REST API** covering all of the above.
 - **Optional AI-assisted workflow generation** across four providers (OpenAI, Anthropic, Google, Ollama), which degrades to a clear error rather than a crash when none are configured.
-- **A React dashboard**: an interactive workflow builder, a live execution graph with a node inspector, a simulation view, metrics, and a plugin manager.
+- **A React dashboard**: a schema-driven workflow builder, a live execution graph that animates node and edge state as a run progresses, a simulation view, an insights view, a plugin catalog, and a project-overview page documenting the whole system.
 
 ## Architecture
 
@@ -55,6 +55,18 @@ flowchart LR
 ```
 
 See [`docs/architecture.md`](docs/architecture.md) for the full pipeline, a sequence diagram of one execution, an explanation of why loops don't need graph cycles, and the safety reasoning behind the Python plugin and the condition evaluator.
+
+### Frontend
+
+The dashboard is a typed React SPA with no state-management library — the API is the only source of truth. It's organized around a collapsible sidebar and a `⌘K` command palette rather than a flat top nav:
+
+- **Project Overview** (`/`) — the page you land on; walks through the architecture, the execution model, and the engineering trade-offs behind it.
+- **Dashboard** (`/dashboard`) — system health, recent activity, and workflows that need attention, at a glance.
+- **Workflows / Builder** — a searchable, category-grouped node palette with drag-and-drop, and an inspector generated directly from each plugin's `config_schema` (typed fields, not a raw JSON textarea).
+- **Executions** — a live execution graph whose node pulses, checkmarks, and animated edges are pure functions of `execution.node_states`, plus a global run history across every workflow.
+- **Insights, Plugins, Activity, Settings** — metrics, the plugin catalog with per-plugin usage counts, a live lifecycle event feed, and AI-provider configuration.
+
+Hovering a workflow renders a mini DAG thumbnail and its recent run stats without navigating away, and every list, form, and dialog is built on one shared component library so the whole surface stays visually consistent.
 
 ## Running it locally
 
@@ -150,7 +162,7 @@ workflow-engine/
 │   ├── api/          FastAPI app and routers
 │   ├── config/       environment-driven settings
 │   └── utils/        safe expression evaluation, templating, ids, logging
-├── frontend/         React + TypeScript + Tailwind dashboard
+├── frontend/         React + TypeScript + Tailwind dashboard (sidebar IA, command palette, schema-driven builder)
 ├── examples/         ready-to-run workflow definitions
 ├── docker/           Dockerfiles and nginx config
 ├── docs/             architecture and API reference
