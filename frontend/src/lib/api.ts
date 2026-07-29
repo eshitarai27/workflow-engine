@@ -51,6 +51,8 @@ export interface WorkflowDefinitionInput {
 export const api = {
   baseUrl: BASE_URL,
 
+  health: () => request<{ service: string; status: string }>("/"),
+
   // Workflows
   listWorkflows: () => request<Workflow[]>("/workflows"),
   getWorkflow: (id: string, version?: number) =>

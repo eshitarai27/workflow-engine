@@ -1,37 +1,38 @@
 import type { ExecutionStatus, NodeState } from "./types";
 
-// Node/execution states are semantic (success, failure, in-progress), so
-// they draw from the status palette, not the categorical one below.
+// Raw hex for contexts Tailwind classes can't reach: ReactFlow inline node
+// styles, the minimap, and Recharts fills. Badges/pills use the Tailwind
+// `status-*`/`category-*` tokens directly (see Badge.tsx) so they stay
+// theme-aware; these are the fixed, single-hex counterparts for canvases.
 export const NODE_STATE_COLORS: Record<NodeState, string> = {
-  WAITING: "#8f8270",
-  READY: "#4c7a96",
-  RUNNING: "#e8722c",
-  SUCCESS: "#4a9d4f",
-  FAILED: "#c1443a",
-  SKIPPED: "#8f8270",
-  CANCELLED: "#d97a4d",
+  WAITING: "#a1a1aa",
+  READY: "#60a5fa",
+  RUNNING: "#f0a020",
+  SUCCESS: "#22c55e",
+  FAILED: "#ef4444",
+  SKIPPED: "#71717a",
+  CANCELLED: "#94a3b8",
 };
 
 export const EXECUTION_STATUS_COLORS: Record<ExecutionStatus, string> = {
-  PENDING: "#8f8270",
-  RUNNING: "#e8722c",
-  PAUSED: "#d4a017",
-  SUCCESS: "#4a9d4f",
-  FAILED: "#c1443a",
-  CANCELLED: "#d97a4d",
+  PENDING: "#a1a1aa",
+  RUNNING: "#f0a020",
+  PAUSED: "#60a5fa",
+  SUCCESS: "#22c55e",
+  FAILED: "#ef4444",
+  CANCELLED: "#94a3b8",
 };
 
-/** One forge-palette slot per plugin category (identity, not state), kept
- * in a fixed order so a category's color never shifts between the Plugin
- * Manager and the builder's node palette. */
+/** One color per plugin category (identity, not state), kept in sync with
+ * the `category.*` tokens in tailwind.config.js. */
 export const CATEGORY_COLORS: Record<string, string> = {
-  network: "#e8722c", // ember
-  compute: "#4c7a96", // steel
-  data: "#c9a13b", // brass
-  storage: "#5c8a5c", // moss
-  notification: "#8b5a8f", // plum
-  ai: "#5b6bab", // indigo
-  general: "#7a7568", // slate
+  network: "#f0a020",
+  compute: "#60a5fa",
+  data: "#a78bfa",
+  storage: "#4ade80",
+  notification: "#f472b6",
+  ai: "#2dd4bf",
+  general: "#a1a1aa",
 };
 
 export function colorForCategory(category: string): string {
@@ -39,9 +40,9 @@ export function colorForCategory(category: string): string {
 }
 
 export function colorForNodeState(state: NodeState): string {
-  return NODE_STATE_COLORS[state] ?? "#8f8270";
+  return NODE_STATE_COLORS[state] ?? "#a1a1aa";
 }
 
 export function colorForExecutionStatus(status: ExecutionStatus): string {
-  return EXECUTION_STATUS_COLORS[status] ?? "#8f8270";
+  return EXECUTION_STATUS_COLORS[status] ?? "#a1a1aa";
 }

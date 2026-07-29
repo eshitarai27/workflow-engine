@@ -9,29 +9,100 @@ body,
 }
 
 body {
-  @apply bg-plane dark:bg-plane-dark text-ink dark:text-ink-dark;
+  @apply bg-plane dark:bg-plane-dark text-ink dark:text-ink-dark antialiased;
+  font-feature-settings: "cv11", "ss01";
   font-variant-numeric: proportional-nums;
+  -webkit-font-smoothing: antialiased;
 }
 
 .tabular {
   font-variant-numeric: tabular-nums;
 }
 
+* {
+  scrollbar-color: theme(colors.baseline.DEFAULT) transparent;
+}
+.dark * {
+  scrollbar-color: theme(colors.baseline.dark) transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
-
 ::-webkit-scrollbar-thumb {
-  @apply bg-hairline dark:bg-hairline-dark rounded-full;
+  @apply bg-baseline dark:bg-baseline-dark rounded-full;
 }
-
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.forge-texture {
-  background-image: radial-gradient(currentColor 1px, transparent 1px);
-  background-size: 22px 22px;
-  color: rgba(143, 130, 112, 0.14);
+::selection {
+  @apply bg-accent/20;
+}
+
+:focus-visible {
+  outline: 2px solid theme(colors.accent.DEFAULT);
+  outline-offset: 1px;
+  border-radius: 3px;
+}
+.dark :focus-visible {
+  outline-color: theme(colors.accent.dark);
+}
+
+kbd,
+.kbd {
+  @apply inline-flex h-5 min-w-[20px] items-center justify-center rounded border border-hairline bg-surface-raised px-1 font-sans text-[11px] font-medium text-ink-muted dark:border-hairline-dark dark:bg-surface-raised-dark dark:text-ink-muted-dark;
+  line-height: 1;
+}
+
+.skeleton {
+  @apply animate-shimmer rounded bg-[length:200%_100%];
+  background-image: linear-gradient(
+    90deg,
+    theme(colors.hairline.DEFAULT) 25%,
+    theme(colors.baseline.DEFAULT) 37%,
+    theme(colors.hairline.DEFAULT) 63%
+  );
+}
+.dark .skeleton {
+  background-image: linear-gradient(
+    90deg,
+    theme(colors.hairline.dark) 25%,
+    theme(colors.baseline.dark) 37%,
+    theme(colors.hairline.dark) 63%
+  );
+}
+
+/* ReactFlow chrome, restyled to match the neutral system instead of the
+   library defaults -- this is the one place !important pulls its weight,
+   since react-flow ships its own high-specificity base stylesheet. */
+.react-flow__attribution {
+  display: none;
+}
+.react-flow__controls {
+  @apply overflow-hidden rounded-md border border-hairline shadow-sm dark:border-hairline-dark;
+  box-shadow: none !important;
+}
+.react-flow__controls-button {
+  @apply border-hairline bg-surface text-ink dark:border-hairline-dark dark:bg-surface-dark dark:text-ink-dark dark:fill-ink-dark;
+  border-bottom-width: 1px !important;
+}
+.react-flow__controls-button:hover {
+  @apply bg-plane dark:bg-plane-dark;
+}
+.react-flow__minimap {
+  @apply overflow-hidden rounded-md border border-hairline dark:border-hairline-dark;
+}
+.react-flow__edge-path {
+  stroke: theme(colors.baseline.DEFAULT);
+}
+.dark .react-flow__edge-path {
+  stroke: theme(colors.baseline.dark);
+}
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: theme(colors.accent.DEFAULT);
+}
+.dark .react-flow__edge.selected .react-flow__edge-path {
+  stroke: theme(colors.accent.dark);
 }

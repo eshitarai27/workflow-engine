@@ -1,9 +1,14 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { api, ApiError } from "../lib/api";
-import type { AIProviderInfo, Execution, GeneratedWorkflow, Workflow } from "../lib/types";
-import StatTile from "../components/StatTile";
-import { ExecutionStatusBadge } from "../components/StatusBadge";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { AlertTriangle, CheckCircle2, Clock, Gauge, Play, Workflow as WorkflowIcon, XCircle } from "lucide-react";
+import { api } from "../lib/api";
+import type { Execution, Workflow } from "../lib/types";
+import { Panel, SectionLabel } from "../components/ui/Panel";
+import Stat from "../components/ui/Stat";
+import EmptyState from "../components/ui/EmptyState";
+import { SkeletonRows } from "../components/ui/Skeleton";
+import Button from "../components/ui/Button";
+import { useNewWorkflowDialog } from "../lib/newWorkflowContext";
 
 function formatDuration(ms: number | null): string {
   if (ms === null) return "—";
@@ -11,118 +16,61 @@ function formatDuration(ms: number | null): string {
   return `${(ms / 1000).toFixed(2)} s`;
 }
 
-function AIGenerateCard() {
-  const [prompt, setPrompt] = useState("");
-  const [providers, setProviders] = useState<AIProviderInfo[]>([]);
-  const [provider, setProvider] = useState<string>("");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<GeneratedWorkflow | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const navigate = useNavigate();
+function relativeTime(iso: string | null): string {
+  if (!iso) return "—";
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const s = Math.floor(diffMs / 1000);
+  if (s < 5) return "just now";
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return new Date(iso).toLocaleDateString();
+}
 
-  useEffect(() => {
-    api.aiProviders().then(setProviders).catch(() => setProviders([]));
-  }, []);
-
-  const anyConfigured = providers.some((p) => p.configured);
-
-  const generate = () => {
-    setLoading(true);
-    setError(null);
-    setResult(null);
-    api
-      .aiGenerate(prompt, provider || undefined)
-      .then(setResult)
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Generation failed"))
-      .finally(() => setLoading(false));
-  };
-
-  const createFromResult = () => {
-    if (!result) return;
-    api.createWorkflow(result.definition).then((wf) => navigate(`/workflows/${wf.id}`));
-  };
-
+function ActivityRow({ execution, workflowName }: { execution: Execution; workflowName: string }) {
+  const Icon = execution.status === "SUCCESS" ? CheckCircle2 : execution.status === "FAILED" ? XCircle : Play;
+  const tone =
+    execution.status === "SUCCESS"
+      ? "text-status-success dark:text-status-success-dark"
+      : execution.status === "FAILED"
+        ? "text-status-danger dark:text-status-danger-dark"
+        : "text-accent dark:text-accent-dark";
   return (
-    <div className="rounded-lg border border-hairline dark:border-hairline-dark bg-surface dark:bg-surface-dark p-5">
-      <div className="mb-1 text-sm font-medium">Generate a workflow from a description</div>
-      <p className="mb-3 text-xs text-ink-muted dark:text-ink-muted-dark">
-        Optional -- requires a configured AI provider (OpenAI, Anthropic, Google, or Ollama).
-      </p>
-      {!anyConfigured && providers.length > 0 && (
-        <div className="mb-3 rounded-md border border-status-warning/30 bg-status-warning/10 px-3 py-2 text-xs text-status-warning">
-          No AI provider is configured on the backend. Set an API key (see .env.example) to enable this.
-        </div>
-      )}
-      <textarea
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-        placeholder="e.g. When a file is uploaded, summarize it and send the summary by email."
-        rows={3}
-        className="w-full resize-none rounded-md border border-hairline dark:border-hairline-dark bg-plane dark:bg-plane-dark px-3 py-2 text-sm outline-none focus:border-forge-1"
-      />
-      <div className="mt-3 flex items-center gap-2">
-        <select
-          value={provider}
-          onChange={(e) => setProvider(e.target.value)}
-          className="rounded-md border border-hairline dark:border-hairline-dark bg-plane dark:bg-plane-dark px-2 py-1.5 text-xs"
-        >
-          <option value="">Auto-select provider</option>
-          {providers.map((p) => (
-            <option key={p.id} value={p.id} disabled={!p.configured}>
-              {p.name} {p.configured ? "" : "(not configured)"}
-            </option>
-          ))}
-        </select>
-        <button
-          onClick={generate}
-          disabled={loading || !prompt.trim()}
-          className="rounded-md bg-forge-1 px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
-        >
-          {loading ? "Generating…" : "Generate"}
-        </button>
-      </div>
-
-      {error && <div className="mt-3 text-xs text-status-critical">{error}</div>}
-
-      {result && (
-        <div className="mt-4 rounded-md border border-hairline dark:border-hairline-dark bg-plane dark:bg-plane-dark p-3">
-          <div className="text-xs text-ink-muted dark:text-ink-muted-dark">{result.explanation}</div>
-          <div className="mt-2 text-xs">
-            {result.validation_errors.length === 0 ? (
-              <span className="text-status-good">✓ Generated workflow is valid</span>
-            ) : (
-              <span className="text-status-critical">{result.validation_errors.join("; ")}</span>
-            )}
-          </div>
-          <button
-            onClick={createFromResult}
-            disabled={result.validation_errors.length > 0}
-            className="mt-2 rounded-md border border-hairline dark:border-hairline-dark px-2.5 py-1 text-xs hover:border-baseline dark:hover:border-baseline-dark disabled:opacity-50"
-          >
-            Save this workflow →
-          </button>
-        </div>
-      )}
-    </div>
+    <Link
+      to={`/executions/${execution.id}`}
+      className="flex items-center gap-3 border-b border-hairline px-4 py-2.5 text-sm transition-colors last:border-0 hover:bg-plane dark:border-hairline-dark dark:hover:bg-plane-dark"
+    >
+      <Icon size={15} className={tone} />
+      <span className="min-w-0 flex-1 truncate text-ink dark:text-ink-dark">
+        {workflowName} <span className="text-ink-faint dark:text-ink-faint-dark">— {execution.status.toLowerCase()}</span>
+      </span>
+      <span className="tabular shrink-0 text-xs text-ink-faint dark:text-ink-faint-dark">{formatDuration(execution.duration_ms)}</span>
+      <span className="shrink-0 text-xs text-ink-faint dark:text-ink-faint-dark">{relativeTime(execution.started_at)}</span>
+    </Link>
   );
 }
 
 export default function Dashboard() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [executions, setExecutions] = useState<Execution[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const openNewWorkflow = useNewWorkflowDialog();
 
   useEffect(() => {
     let cancelled = false;
     const load = () => {
-      Promise.all([api.listWorkflows(), api.listExecutions(undefined, 8)])
+      Promise.all([api.listWorkflows(), api.listExecutions(undefined, 50)])
         .then(([w, e]) => {
           if (cancelled) return;
           setWorkflows(w);
           setExecutions(e);
           setError(null);
         })
-        .catch(() => !cancelled && setError("Could not reach the FlowForge API."));
+        .catch(() => !cancelled && setError("Could not reach the FlowForge API."))
+        .finally(() => !cancelled && setLoading(false));
     };
     load();
     const interval = setInterval(load, 4000);
@@ -132,85 +80,131 @@ export default function Dashboard() {
     };
   }, []);
 
+  const nameForWorkflow = useMemo(() => {
+    const map = new Map(workflows.map((w) => [w.id, w.name]));
+    return (id: string) => map.get(id) ?? id;
+  }, [workflows]);
+
   const running = executions.filter((e) => e.status === "RUNNING").length;
-  const failed = executions.filter((e) => e.status === "FAILED").length;
+  const terminal = executions.filter((e) => e.status === "SUCCESS" || e.status === "FAILED");
+  const successRate = terminal.length ? Math.round((terminal.filter((e) => e.status === "SUCCESS").length / terminal.length) * 100) : null;
+  const durations = executions.map((e) => e.duration_ms).filter((d): d is number => d !== null);
+  const avgDuration = durations.length ? durations.reduce((a, b) => a + b, 0) / durations.length : null;
+  const failing = executions.filter((e) => e.status === "FAILED").slice(0, 5);
+  const recent = executions.slice(0, 8);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-5">
+        <div className="h-6 w-32 skeleton" />
+        <Panel>
+          <SkeletonRows rows={4} />
+        </Panel>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-8">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-sm text-ink-muted dark:text-ink-muted-dark">
-          FlowForge API at <span className="tabular">{api.baseUrl}</span>
-        </p>
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight text-ink dark:text-ink-dark">Dashboard</h1>
+          <p className="mt-1 text-sm text-ink-muted dark:text-ink-muted-dark">
+            {api.baseUrl} <span className="text-ink-faint dark:text-ink-faint-dark">·</span>{" "}
+            {error ? "unreachable" : "connected"}
+          </p>
+        </div>
+        <Button variant="primary" onClick={openNewWorkflow}>
+          + New workflow
+        </Button>
       </div>
 
       {error && (
-        <div className="rounded-md border border-status-critical/30 bg-status-critical/10 px-4 py-3 text-sm text-status-critical">
+        <div className="rounded-md border border-status-danger/30 bg-status-danger/10 px-4 py-3 text-sm text-status-danger dark:border-status-danger-dark/30 dark:bg-status-danger-dark/10 dark:text-status-danger-dark">
           {error} Start it with <code className="tabular">python main.py</code>.
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <StatTile label="Workflows" value={String(workflows.length)} />
-        <StatTile label="Recent executions" value={String(executions.length)} />
-        <StatTile label="Running now" value={String(running)} accent={running > 0 ? "#e8722c" : undefined} />
-        <StatTile label="Failed (recent)" value={String(failed)} accent={failed > 0 ? "#c1443a" : undefined} />
-      </div>
+      <Panel className="grid grid-cols-2 divide-x divide-hairline md:grid-cols-4 dark:divide-hairline-dark">
+        <Stat label="Workflows" value={String(workflows.length)} icon={<WorkflowIcon size={13} />} />
+        <Stat
+          label="Success rate"
+          value={successRate === null ? "—" : `${successRate}%`}
+          hint={`${terminal.length} recent runs`}
+          tone={successRate !== null && successRate < 80 ? "danger" : undefined}
+          icon={<Gauge size={13} />}
+        />
+        <Stat label="Running now" value={String(running)} tone={running > 0 ? "accent" : undefined} icon={<Play size={13} />} />
+        <Stat label="Avg duration" value={avgDuration === null ? "—" : formatDuration(avgDuration)} icon={<Clock size={13} />} />
+      </Panel>
 
-      <AIGenerateCard />
-
-      <div>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-medium text-ink-muted dark:text-ink-muted-dark">Recent executions</h2>
-          <Link to="/workflows" className="text-xs text-forge-1 hover:underline">
-            View all workflows →
-          </Link>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <SectionLabel className="mb-2">Recent activity</SectionLabel>
+          <Panel className="overflow-hidden">
+            {recent.length === 0 ? (
+              <EmptyState
+                icon={Play}
+                title="No executions yet"
+                description="Run a workflow to see live activity appear here."
+                action={
+                  <Link to="/workflows" className="text-xs text-accent hover:underline dark:text-accent-dark">
+                    Go to workflows →
+                  </Link>
+                }
+              />
+            ) : (
+              recent.map((e) => <ActivityRow key={e.id} execution={e} workflowName={nameForWorkflow(e.workflow_id)} />)
+            )}
+          </Panel>
         </div>
-        <div className="overflow-hidden rounded-lg border border-hairline dark:border-hairline-dark bg-surface dark:bg-surface-dark">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-hairline dark:border-hairline-dark text-left text-xs text-ink-muted dark:text-ink-muted-dark">
-                <th className="px-4 py-2.5 font-normal">Workflow</th>
-                <th className="px-4 py-2.5 font-normal">Status</th>
-                <th className="px-4 py-2.5 font-normal">Duration</th>
-                <th className="px-4 py-2.5 font-normal">Triggered by</th>
-                <th className="px-4 py-2.5 font-normal">Execution</th>
-              </tr>
-            </thead>
-            <tbody>
-              {executions.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-ink-faint">
-                    No executions yet. Create a workflow and run it.
-                  </td>
-                </tr>
+
+        <div className="flex flex-col gap-5">
+          <div>
+            <SectionLabel className="mb-2">Needs attention</SectionLabel>
+            <Panel className="overflow-hidden">
+              {failing.length === 0 ? (
+                <div className="flex items-center gap-2 px-4 py-4 text-sm text-status-success dark:text-status-success-dark">
+                  <CheckCircle2 size={15} />
+                  All recent runs succeeded
+                </div>
+              ) : (
+                failing.map((e) => (
+                  <Link
+                    key={e.id}
+                    to={`/executions/${e.id}`}
+                    className="flex items-center gap-2 border-b border-hairline px-4 py-2.5 text-sm last:border-0 hover:bg-plane dark:border-hairline-dark dark:hover:bg-plane-dark"
+                  >
+                    <AlertTriangle size={14} className="shrink-0 text-status-danger dark:text-status-danger-dark" />
+                    <span className="min-w-0 flex-1 truncate text-ink dark:text-ink-dark">{nameForWorkflow(e.workflow_id)}</span>
+                    <span className="shrink-0 text-xs text-ink-faint dark:text-ink-faint-dark">{relativeTime(e.started_at)}</span>
+                  </Link>
+                ))
               )}
-              {executions.map((e) => (
-                <tr
-                  key={e.id}
-                  className="border-b border-hairline dark:border-hairline-dark last:border-0 hover:bg-plane dark:hover:bg-plane-dark"
-                >
-                  <td className="px-4 py-2.5">
-                    <Link to={`/workflows/${e.workflow_id}`} className="text-forge-1 hover:underline">
-                      {e.workflow_id}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <ExecutionStatusBadge status={e.status} />
-                  </td>
-                  <td className="px-4 py-2.5 tabular text-ink-muted dark:text-ink-muted-dark">
-                    {formatDuration(e.duration_ms)}
-                  </td>
-                  <td className="px-4 py-2.5 text-ink-faint">{e.triggered_by}</td>
-                  <td className="px-4 py-2.5">
-                    <Link to={`/executions/${e.id}`} className="tabular text-xs text-forge-1 hover:underline">
-                      {e.id.slice(0, 14)}…
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            </Panel>
+          </div>
+
+          <div>
+            <SectionLabel className="mb-2">Shortcuts</SectionLabel>
+            <Panel>
+              <div className="flex items-center gap-2 px-4 py-2.5">
+                <span className="text-xs text-ink-muted dark:text-ink-muted-dark">Press</span>
+                <kbd>⌘K</kbd>
+                <span className="text-xs text-ink-muted dark:text-ink-muted-dark">to jump anywhere</span>
+              </div>
+              <div className="flex flex-col gap-1 px-2 pb-2">
+                <Link to="/builder" className="rounded px-2.5 py-1.5 text-sm text-ink hover:bg-plane dark:text-ink-dark dark:hover:bg-plane-dark">
+                  Open the builder
+                </Link>
+                <Link to="/plugins" className="rounded px-2.5 py-1.5 text-sm text-ink hover:bg-plane dark:text-ink-dark dark:hover:bg-plane-dark">
+                  Browse plugins
+                </Link>
+                <Link to="/settings" className="rounded px-2.5 py-1.5 text-sm text-ink hover:bg-plane dark:text-ink-dark dark:hover:bg-plane-dark">
+                  Configure AI provider
+                </Link>
+              </div>
+            </Panel>
+          </div>
         </div>
       </div>
     </div>

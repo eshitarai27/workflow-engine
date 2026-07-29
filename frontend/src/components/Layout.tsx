@@ -1,61 +1,73 @@
-import { NavLink, Outlet } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { Outlet, useLocation } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronRight, Search } from "lucide-react";
+import Sidebar from "./Sidebar";
+import CommandPalette from "./ui/CommandPalette";
+import { TooltipProvider } from "./ui/Tooltip";
+import Toaster from "./ui/Toaster";
+import NewWorkflowDialog from "./NewWorkflowDialog";
+import { NewWorkflowDialogContext } from "../lib/newWorkflowContext";
 import { api } from "../lib/api";
 
-const NAV_ITEMS = [
-  { to: "/", label: "Dashboard" },
-  { to: "/workflows", label: "Workflows" },
-  { to: "/builder", label: "Builder" },
-  { to: "/metrics", label: "Metrics" },
-  { to: "/plugins", label: "Plugins" },
-  { to: "/events", label: "Events" },
-];
+const SEGMENT_LABELS: Record<string, string> = {
+  dashboard: "Dashboard",
+  workflows: "Workflows",
+  builder: "Builder",
+  executions: "Executions",
+  metrics: "Insights",
+  plugins: "Plugins",
+  events: "Activity",
+  settings: "Settings",
+  simulate: "Simulate",
+};
 
-function Mark() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect width="24" height="24" rx="6" fill="#e8722c" />
-      <path d="M6 12h5l-1.5 5L18 10h-5l1.5-5L6 12z" fill="#15130f" />
-    </svg>
-  );
+function isCanvasRoute(pathname: string) {
+  return pathname.startsWith("/builder") || /^\/executions\/[^/]+$/.test(pathname);
 }
 
-function ThemeToggle() {
+function useBreadcrumb() {
+  const { pathname } = useLocation();
+  return useMemo(() => {
+    if (pathname === "/") return ["Project Overview"];
+    const segments = pathname.split("/").filter(Boolean);
+    return segments.map((seg) => SEGMENT_LABELS[seg] ?? (seg.length > 16 ? `${seg.slice(0, 14)}…` : seg));
+  }, [pathname]);
+}
+
+function useTheme() {
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     if (typeof window === "undefined") return "dark";
     const stored = window.localStorage.getItem("theme");
     if (stored === "light" || stored === "dark") return stored;
-    // FlowForge defaults to dark, the way most operator-facing consoles
-    // (Temporal, Airflow, Grafana) do, unless the OS says otherwise.
     return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
   });
-
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
     window.localStorage.setItem("theme", theme);
   }, [theme]);
-
-  return (
-    <button
-      onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-      className="rounded border border-hairline dark:border-hairline-dark px-2.5 py-1 text-xs text-ink-muted dark:text-ink-muted-dark hover:text-ink dark:hover:text-ink-dark hover:border-baseline dark:hover:border-baseline-dark transition-colors"
-      aria-label="Toggle theme"
-    >
-      {theme === "dark" ? "☀ Light" : "☾ Dark"}
-    </button>
-  );
+  return [theme, () => setTheme((t) => (t === "dark" ? "light" : "dark"))] as const;
 }
 
-function ServerStatus() {
-  const [online, setOnline] = useState<boolean | null>(null);
+export default function Layout() {
+  const [theme, toggleTheme] = useTheme();
+  const [collapsed, setCollapsed] = useState(() => window.localStorage.getItem("sidebar-collapsed") === "1");
+  const [apiOnline, setApiOnline] = useState<boolean | null>(null);
+  const [newWorkflowOpen, setNewWorkflowOpen] = useState(false);
+  const breadcrumb = useBreadcrumb();
+  const { pathname } = useLocation();
+  const fullBleed = isCanvasRoute(pathname);
+
+  useEffect(() => {
+    window.localStorage.setItem("sidebar-collapsed", collapsed ? "1" : "0");
+  }, [collapsed]);
 
   useEffect(() => {
     let cancelled = false;
     const check = () => {
       api
-        .listPlugins()
-        .then(() => !cancelled && setOnline(true))
-        .catch(() => !cancelled && setOnline(false));
+        .health()
+        .then(() => !cancelled && setApiOnline(true))
+        .catch(() => !cancelled && setApiOnline(false));
     };
     check();
     const interval = setInterval(check, 10000);
@@ -66,57 +78,47 @@ function ServerStatus() {
   }, []);
 
   return (
-    <div className="flex items-center gap-1.5 text-xs text-ink-muted dark:text-ink-muted-dark">
-      <span
-        className={`h-1.5 w-1.5 rounded-full ${
-          online === null ? "bg-ink-faint" : online ? "bg-status-good" : "bg-status-critical"
-        }`}
-      />
-      {online === null ? "checking" : online ? "API online" : "API unreachable"}
-    </div>
-  );
-}
+    <NewWorkflowDialogContext.Provider value={() => setNewWorkflowOpen(true)}>
+      <TooltipProvider>
+        <div className="flex h-screen overflow-hidden bg-plane dark:bg-plane-dark">
+          <Sidebar
+            collapsed={collapsed}
+            onToggleCollapsed={() => setCollapsed((c) => !c)}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            apiOnline={apiOnline}
+          />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <header className="flex h-12 shrink-0 items-center justify-between gap-4 border-b border-hairline px-5 dark:border-hairline-dark">
+              <div className="flex items-center gap-1.5 text-sm text-ink-muted dark:text-ink-muted-dark">
+                {breadcrumb.map((crumb, i) => (
+                  <span key={i} className="flex items-center gap-1.5">
+                    {i > 0 && <ChevronRight size={13} className="text-ink-faint dark:text-ink-faint-dark" />}
+                    <span className={i === breadcrumb.length - 1 ? "font-medium text-ink dark:text-ink-dark" : ""}>{crumb}</span>
+                  </span>
+                ))}
+              </div>
+              <button
+                onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+                className="flex items-center gap-2 rounded-md border border-hairline bg-plane px-2.5 py-1 text-xs text-ink-faint transition-colors hover:border-baseline hover:text-ink-muted dark:border-hairline-dark dark:bg-plane-dark dark:text-ink-faint-dark dark:hover:border-baseline-dark dark:hover:text-ink-muted-dark"
+              >
+                <Search size={13} />
+                Search
+                <kbd>⌘K</kbd>
+              </button>
+            </header>
+            <main className={fullBleed ? "flex-1 overflow-hidden" : "flex-1 overflow-y-auto"}>
+              <div className={fullBleed ? "h-full" : "mx-auto max-w-[1200px] px-6 py-6"}>
+                <Outlet />
+              </div>
+            </main>
+          </div>
+        </div>
 
-export default function Layout() {
-  return (
-    <div className="flex min-h-screen flex-col">
-      <header className="border-b border-hairline dark:border-hairline-dark bg-surface dark:bg-surface-dark">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-8 py-3">
-          <div className="flex items-center gap-8">
-            <div className="flex items-center gap-2">
-              <Mark />
-              <span className="text-sm font-semibold tracking-tight">FlowForge</span>
-            </div>
-            <nav className="flex items-center gap-5">
-              {NAV_ITEMS.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.to === "/"}
-                  className={({ isActive }) =>
-                    `border-b-2 py-1 text-sm transition-colors ${
-                      isActive
-                        ? "border-forge-1 text-ink dark:text-ink-dark font-medium"
-                        : "border-transparent text-ink-muted dark:text-ink-muted-dark hover:text-ink dark:hover:text-ink-dark"
-                    }`
-                  }
-                >
-                  {item.label}
-                </NavLink>
-              ))}
-            </nav>
-          </div>
-          <div className="flex items-center gap-3">
-            <ServerStatus />
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
-      <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-6xl px-8 py-8">
-          <Outlet />
-        </div>
-      </main>
-    </div>
+        <CommandPalette theme={theme} onToggleTheme={toggleTheme} onCreateWorkflow={() => setNewWorkflowOpen(true)} />
+        <NewWorkflowDialog open={newWorkflowOpen} onOpenChange={setNewWorkflowOpen} />
+        <Toaster />
+      </TooltipProvider>
+    </NewWorkflowDialogContext.Provider>
   );
 }

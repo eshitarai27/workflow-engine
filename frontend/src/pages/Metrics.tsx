@@ -2,22 +2,23 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../lib/api";
 import type { Execution } from "../lib/types";
-import StatTile from "../components/StatTile";
+import { Panel, SectionLabel } from "../components/ui/Panel";
+import Stat from "../components/ui/Stat";
 import { colorForExecutionStatus } from "../lib/colors";
 
-const FORGE_PRIMARY = "#e8722c";
+const ACCENT = "#f0a020";
 
 function ChartCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="rounded-lg border border-hairline dark:border-hairline-dark bg-surface dark:bg-surface-dark p-5">
-      <div className="mb-4 text-sm font-medium text-ink-muted dark:text-ink-muted-dark">{title}</div>
-      <div style={{ width: "100%", height: 260 }}>{children}</div>
-    </div>
+    <Panel className="p-4">
+      <SectionLabel className="mb-3">{title}</SectionLabel>
+      <div style={{ width: "100%", height: 240 }}>{children}</div>
+    </Panel>
   );
 }
 
 function EmptyState() {
-  return <div className="flex h-full items-center justify-center text-xs text-ink-faint">No data yet</div>;
+  return <div className="flex h-full items-center justify-center text-xs text-ink-faint dark:text-ink-faint-dark">No data yet</div>;
 }
 
 export default function Metrics() {
@@ -42,7 +43,7 @@ export default function Metrics() {
 
   if (error) {
     return (
-      <div className="rounded-md border border-status-critical/30 bg-status-critical/10 px-4 py-3 text-sm text-status-critical">
+      <div className="rounded-md border border-status-danger/30 bg-status-danger/10 px-4 py-3 text-sm text-status-danger dark:border-status-danger-dark/30 dark:bg-status-danger-dark/10 dark:text-status-danger-dark">
         {error}
       </div>
     );
@@ -55,10 +56,7 @@ export default function Metrics() {
   const avgDuration = durations.length ? durations.reduce((a, b) => a + b, 0) / durations.length : 0;
 
   const statusBuckets = ["PENDING", "RUNNING", "PAUSED", "SUCCESS", "FAILED", "CANCELLED"] as const;
-  const statusData = statusBuckets.map((status) => ({
-    status,
-    count: executions.filter((e) => e.status === status).length,
-  }));
+  const statusData = statusBuckets.map((status) => ({ status, count: executions.filter((e) => e.status === status).length }));
 
   const byWorkflow = new Map<string, { count: number; totalDuration: number }>();
   for (const e of executions) {
@@ -73,21 +71,22 @@ export default function Metrics() {
     avgDurationMs: v.count ? v.totalDuration / v.count : 0,
   }));
 
+  const tickStyle = { fontSize: 11, fill: "#a1a1aa" };
+  const tooltipStyle = { fontSize: 12, borderRadius: 8, border: "1px solid #232327", background: "#18181b", color: "#f4f4f5" };
+
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">Metrics</h1>
-        <p className="mt-1 text-sm text-ink-muted dark:text-ink-muted-dark">
-          Aggregated from the most recent {total} executions.
-        </p>
+        <h1 className="text-xl font-semibold tracking-tight text-ink dark:text-ink-dark">Insights</h1>
+        <p className="mt-1 text-sm text-ink-muted dark:text-ink-muted-dark">Aggregated from the most recent {total} executions.</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <StatTile label="Total executions" value={String(total)} />
-        <StatTile label="Succeeded" value={String(succeeded)} accent={succeeded > 0 ? "#4a9d4f" : undefined} />
-        <StatTile label="Failed" value={String(failed)} accent={failed > 0 ? "#c1443a" : undefined} />
-        <StatTile label="Avg duration" value={`${avgDuration.toFixed(0)} ms`} />
-      </div>
+      <Panel className="grid grid-cols-2 divide-x divide-hairline md:grid-cols-4 dark:divide-hairline-dark">
+        <Stat label="Total executions" value={String(total)} />
+        <Stat label="Succeeded" value={String(succeeded)} tone={succeeded > 0 ? "success" : undefined} />
+        <Stat label="Failed" value={String(failed)} tone={failed > 0 ? "danger" : undefined} />
+        <Stat label="Avg duration" value={`${avgDuration.toFixed(0)} ms`} />
+      </Panel>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <ChartCard title="Executions by status">
@@ -96,11 +95,11 @@ export default function Metrics() {
           ) : (
             <ResponsiveContainer>
               <BarChart data={statusData} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#332c22" vertical={false} />
-                <XAxis dataKey="status" tick={{ fontSize: 11, fill: "#8f8270" }} />
-                <YAxis tick={{ fontSize: 11, fill: "#8f8270" }} allowDecimals={false} />
-                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #332c22" }} />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={48}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#232327" vertical={false} />
+                <XAxis dataKey="status" tick={tickStyle} axisLine={{ stroke: "#232327" }} tickLine={false} />
+                <YAxis tick={tickStyle} allowDecimals={false} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(161,161,170,0.08)" }} />
+                <Bar dataKey="count" radius={[3, 3, 0, 0]} maxBarSize={40}>
                   {statusData.map((entry) => (
                     <Cell key={entry.status} fill={colorForExecutionStatus(entry.status)} />
                   ))}
@@ -116,11 +115,11 @@ export default function Metrics() {
           ) : (
             <ResponsiveContainer>
               <BarChart data={workflowData} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#332c22" vertical={false} />
-                <XAxis dataKey="workflow" tick={{ fontSize: 11, fill: "#8f8270" }} />
-                <YAxis tick={{ fontSize: 11, fill: "#8f8270" }} allowDecimals={false} />
-                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #332c22" }} />
-                <Bar dataKey="count" fill={FORGE_PRIMARY} radius={[4, 4, 0, 0]} maxBarSize={48} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#232327" vertical={false} />
+                <XAxis dataKey="workflow" tick={tickStyle} axisLine={{ stroke: "#232327" }} tickLine={false} />
+                <YAxis tick={tickStyle} allowDecimals={false} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(161,161,170,0.08)" }} />
+                <Bar dataKey="count" fill={ACCENT} radius={[3, 3, 0, 0]} maxBarSize={40} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -132,14 +131,11 @@ export default function Metrics() {
           ) : (
             <ResponsiveContainer>
               <BarChart data={workflowData} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#332c22" vertical={false} />
-                <XAxis dataKey="workflow" tick={{ fontSize: 11, fill: "#8f8270" }} />
-                <YAxis tick={{ fontSize: 11, fill: "#8f8270" }} />
-                <Tooltip
-                  contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #332c22" }}
-                  formatter={(value: number) => `${value.toFixed(1)} ms`}
-                />
-                <Bar dataKey="avgDurationMs" fill={FORGE_PRIMARY} radius={[4, 4, 0, 0]} maxBarSize={48} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#232327" vertical={false} />
+                <XAxis dataKey="workflow" tick={tickStyle} axisLine={{ stroke: "#232327" }} tickLine={false} />
+                <YAxis tick={tickStyle} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(161,161,170,0.08)" }} formatter={(value: number) => `${value.toFixed(1)} ms`} />
+                <Bar dataKey="avgDurationMs" fill={ACCENT} radius={[3, 3, 0, 0]} maxBarSize={40} />
               </BarChart>
             </ResponsiveContainer>
           )}

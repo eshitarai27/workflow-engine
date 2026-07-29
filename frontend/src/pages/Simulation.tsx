@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { ArrowLeft, GitBranch } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import type { SimulationResult } from "../lib/types";
+import { Panel, SectionLabel } from "../components/ui/Panel";
+import Stat from "../components/ui/Stat";
+import { cn } from "../lib/cn";
 
 export default function Simulation() {
   const { workflowId } = useParams<{ workflowId: string }>();
@@ -18,7 +22,7 @@ export default function Simulation() {
 
   if (error) {
     return (
-      <div className="rounded-md border border-status-critical/30 bg-status-critical/10 px-4 py-3 text-sm text-status-critical">
+      <div className="rounded-md border border-status-danger/30 bg-status-danger/10 px-4 py-3 text-sm text-status-danger dark:border-status-danger-dark/30 dark:bg-status-danger-dark/10 dark:text-status-danger-dark">
         {error}
       </div>
     );
@@ -33,90 +37,74 @@ export default function Simulation() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Simulation</h1>
-          <p className="mt-1 text-sm text-ink-muted dark:text-ink-muted-dark">
-            What this workflow would do -- no node's action actually runs.
-          </p>
+          <Link to={`/workflows/${workflowId}`} className="mb-1 flex w-fit items-center gap-1 text-xs text-ink-faint hover:text-ink-muted dark:text-ink-faint-dark dark:hover:text-ink-muted-dark">
+            <ArrowLeft size={12} /> Back to workflow
+          </Link>
+          <h1 className="text-xl font-semibold tracking-tight text-ink dark:text-ink-dark">Simulation</h1>
+          <p className="mt-1 text-sm text-ink-muted dark:text-ink-muted-dark">What this workflow would do — no node's action actually runs.</p>
         </div>
-        <Link to={`/workflows/${workflowId}`} className="text-xs text-forge-1 hover:underline">
-          ← Back to workflow
-        </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <div className="rounded-lg border border-hairline dark:border-hairline-dark bg-surface dark:bg-surface-dark px-5 py-4">
-          <div className="text-xs text-ink-muted dark:text-ink-muted-dark">Estimated runtime</div>
-          <div className="tabular mt-1.5 text-2xl font-semibold">{result.estimated_runtime_seconds.toFixed(2)}s</div>
-        </div>
-        <div className="rounded-lg border border-hairline dark:border-hairline-dark bg-surface dark:bg-surface-dark px-5 py-4">
-          <div className="text-xs text-ink-muted dark:text-ink-muted-dark">Nodes</div>
-          <div className="tabular mt-1.5 text-2xl font-semibold">{result.execution_order.length}</div>
-        </div>
-        <div className="rounded-lg border border-hairline dark:border-hairline-dark bg-surface dark:bg-surface-dark px-5 py-4">
-          <div className="text-xs text-ink-muted dark:text-ink-muted-dark">Layers</div>
-          <div className="tabular mt-1.5 text-2xl font-semibold">{result.layers.length}</div>
-        </div>
-        <div className="rounded-lg border border-hairline dark:border-hairline-dark bg-surface dark:bg-surface-dark px-5 py-4">
-          <div className="text-xs text-ink-muted dark:text-ink-muted-dark">Parallel branches</div>
-          <div className="tabular mt-1.5 text-2xl font-semibold">{result.parallel_branches.length}</div>
-        </div>
-      </div>
+      <Panel className="grid grid-cols-2 divide-x divide-hairline md:grid-cols-4 dark:divide-hairline-dark">
+        <Stat label="Estimated runtime" value={`${result.estimated_runtime_seconds.toFixed(2)}s`} />
+        <Stat label="Nodes" value={String(result.execution_order.length)} />
+        <Stat label="Layers" value={String(result.layers.length)} />
+        <Stat label="Parallel branches" value={String(result.parallel_branches.length)} />
+      </Panel>
 
       {result.warnings.length > 0 && (
-        <div className="rounded-md border border-status-warning/30 bg-status-warning/10 px-4 py-3 text-xs text-status-warning">
+        <div className="rounded-md border border-status-warning/30 bg-status-warning/10 px-4 py-3 text-xs text-status-warning dark:border-status-warning-dark/30 dark:bg-status-warning-dark/10 dark:text-status-warning-dark">
           {result.warnings.join(" · ")}
         </div>
       )}
 
       <div>
-        <h2 className="mb-3 text-sm font-medium text-ink-muted dark:text-ink-muted-dark">Execution layers</h2>
+        <SectionLabel className="mb-2">Execution layers</SectionLabel>
         <div className="flex flex-col gap-2">
           {result.layers.map((layer, i) => (
-            <div key={i} className="flex items-center gap-2 rounded-lg border border-hairline dark:border-hairline-dark bg-surface dark:bg-surface-dark p-3">
-              <span className="tabular w-16 shrink-0 text-xs text-ink-faint">Layer {i + 1}</span>
+            <Panel key={i} className="flex items-center gap-2 p-3">
+              <span className="tabular w-16 shrink-0 text-xs text-ink-faint dark:text-ink-faint-dark">Layer {i + 1}</span>
               <div className="flex flex-wrap gap-2">
                 {layer.map((nodeId) => (
                   <span
                     key={nodeId}
-                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                    className={cn(
+                      "rounded px-2 py-0.5 text-xs font-medium",
                       criticalSet.has(nodeId)
-                        ? "bg-forge-8/20 text-forge-8"
-                        : "bg-plane dark:bg-plane-dark text-ink-muted dark:text-ink-muted-dark"
-                    }`}
+                        ? "bg-accent-muted text-accent dark:bg-accent-muted-dark dark:text-accent-dark"
+                        : "bg-plane text-ink-muted dark:bg-plane-dark dark:text-ink-muted-dark"
+                    )}
                   >
                     {nodeId}
                   </span>
                 ))}
               </div>
-            </div>
+            </Panel>
           ))}
         </div>
       </div>
 
       <div>
-        <h2 className="mb-3 text-sm font-medium text-ink-muted dark:text-ink-muted-dark">
-          Critical path (the floor on how fast this workflow can finish)
-        </h2>
-        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-hairline dark:border-hairline-dark bg-surface dark:bg-surface-dark p-4 text-sm">
+        <SectionLabel className="mb-2 flex items-center gap-1.5">
+          <GitBranch size={12} /> Critical path — the floor on how fast this workflow can finish
+        </SectionLabel>
+        <Panel className="flex flex-wrap items-center gap-1.5 p-4 text-sm">
           {result.critical_path.map((nodeId, i) => (
             <span key={nodeId} className="flex items-center gap-1.5">
-              <span className="rounded-full bg-forge-8/20 px-2.5 py-1 text-xs font-medium text-forge-8">{nodeId}</span>
-              {i < result.critical_path.length - 1 && <span className="text-ink-faint">→</span>}
+              <span className="rounded bg-accent-muted px-2 py-0.5 text-xs font-medium text-accent dark:bg-accent-muted-dark dark:text-accent-dark">{nodeId}</span>
+              {i < result.critical_path.length - 1 && <span className="text-ink-faint dark:text-ink-faint-dark">→</span>}
             </span>
           ))}
-        </div>
+        </Panel>
       </div>
 
       {result.bottlenecks.length > 0 && (
         <div>
-          <h2 className="mb-3 text-sm font-medium text-ink-muted dark:text-ink-muted-dark">Potential bottlenecks</h2>
+          <SectionLabel className="mb-2">Potential bottlenecks</SectionLabel>
           <div className="flex flex-col gap-2">
             {result.bottlenecks.map((b) => (
-              <div
-                key={b.node_id}
-                className="rounded-lg border border-status-warning/30 bg-status-warning/10 p-3 text-sm"
-              >
-                <span className="font-medium">{b.node_id}</span>
+              <div key={b.node_id} className="rounded-lg border border-status-warning/30 bg-status-warning/10 p-3 text-sm dark:border-status-warning-dark/30 dark:bg-status-warning-dark/10">
+                <span className="font-medium text-ink dark:text-ink-dark">{b.node_id}</span>
                 <span className="ml-2 text-xs text-ink-muted dark:text-ink-muted-dark">{b.reason}</span>
               </div>
             ))}
