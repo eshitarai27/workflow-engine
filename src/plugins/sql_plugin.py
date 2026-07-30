@@ -7,6 +7,7 @@ using this plugin still runs with zero external services -- point
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 from typing import Any, ClassVar, Dict, List
 
 from src.models.execution import ExecutionContext
@@ -33,6 +34,10 @@ class SqlPlugin(Plugin):
         query = config["query"]
         params = config.get("params") or []
 
+        if db_path != ":memory:":
+            Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+
+        connection = None
         try:
             connection = sqlite3.connect(db_path)
             connection.row_factory = sqlite3.Row
@@ -47,7 +52,8 @@ class SqlPlugin(Plugin):
         except sqlite3.Error as exc:
             raise PluginExecutionError(f"SQL execution failed: {exc}") from exc
         finally:
-            connection.close()
+            if connection is not None:
+                connection.close()
 
         self._log("sql query executed", db_path=db_path, row_count=result["row_count"])
         return result

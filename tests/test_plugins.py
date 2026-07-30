@@ -48,6 +48,21 @@ def test_sql_plugin_runs_query_against_in_memory_db(plugin_registry):
     assert result["rows"] == [{"a": 1, "b": 2}]
 
 
+def test_sql_plugin_creates_missing_parent_directories(plugin_registry, tmp_path):
+    plugin = plugin_registry.get("sql")
+    context = ExecutionContext({})
+    db_path = tmp_path / "nested" / "does" / "not" / "exist" / "test.db"
+    plugin.execute({"db_path": str(db_path), "query": "CREATE TABLE t (id INTEGER)"}, context)
+    assert db_path.is_file()
+
+
+def test_sql_plugin_raises_plugin_execution_error_on_bad_query(plugin_registry):
+    plugin = plugin_registry.get("sql")
+    context = ExecutionContext({})
+    with pytest.raises(PluginExecutionError):
+        plugin.execute({"db_path": ":memory:", "query": "NOT VALID SQL"}, context)
+
+
 def test_filesystem_plugin_writes_and_reads_a_file(plugin_registry, monkeypatch, tmp_path):
     import src.plugins.filesystem_plugin as fs_module
 
