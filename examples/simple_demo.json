@@ -1,0 +1,45 @@
+{
+  "id": "wf_simple_demo",
+  "name": "Simple Demo",
+  "description": "A minimal 3-node pipeline prepared ahead of time: generate some numbers, compute a summary, write it to a file. No external calls, so it always runs fast and reliably live.",
+  "nodes": [
+    {
+      "id": "generate",
+      "name": "Generate numbers",
+      "action": {
+        "plugin_id": "python",
+        "config": {
+          "code": "def run(state):\n    return {'numbers': [4, 8, 15, 16, 23, 42]}"
+        }
+      }
+    },
+    {
+      "id": "summarize",
+      "name": "Compute average",
+      "action": {
+        "plugin_id": "python",
+        "config": {
+          "code": "def run(state):\n    numbers = state.get('numbers', [])\n    avg = sum(numbers) / len(numbers) if numbers else 0\n    return {'summary': f'Average of {numbers} is {avg:.2f}'}"
+        }
+      }
+    },
+    {
+      "id": "save",
+      "name": "Save summary to file",
+      "action": {
+        "plugin_id": "filesystem",
+        "config": {
+          "operation": "write",
+          "path": "simple_demo_summary.txt",
+          "content": "{{summary}}"
+        }
+      }
+    }
+  ],
+  "edges": [
+    { "source": "generate", "target": "summarize" },
+    { "source": "summarize", "target": "save" }
+  ],
+  "triggers": [],
+  "metadata": {}
+}
