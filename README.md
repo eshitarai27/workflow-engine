@@ -81,6 +81,12 @@ python main.py                        # listens on http://0.0.0.0:8000
 curl -X POST http://localhost:8000/workflows -H "Content-Type: application/json" -d @examples/code_review_loop.json
 ```
 
+The `summarize_and_notify` example reads `input.txt` from the filesystem plugin's root (`data/files/` by default, or `FLOWFORGE_FS_ROOT`), which isn't checked in. Create it before running that example:
+
+```bash
+mkdir -p data/files && echo "Some text to summarize." > data/files/input.txt
+```
+
 Configuration is entirely optional and read from environment variables in `src/config/settings.py`. See `.env.example` for the full list, including the AI provider keys.
 
 ### Frontend
